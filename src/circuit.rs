@@ -1,7 +1,7 @@
 use crate::hash_type::HashType;
 use crate::matrix::Matrix;
 use crate::mds::SparseMatrix;
-use crate::poseidon::{Arity, PoseidonConstants};
+use crate::poseidon::PoseidonConstants;
 use bellperson::gadgets::boolean::Boolean;
 use bellperson::gadgets::num;
 use bellperson::gadgets::num::AllocatedNum;
@@ -92,10 +92,9 @@ impl<E: Engine> Elt<E> {
 }
 
 /// Circuit for Poseidon hash.
-pub struct PoseidonCircuit<'a, E, A>
+pub struct PoseidonCircuit<'a, E, const A: usize>
 where
     E: Engine,
-    A: Arity<E::Fr>,
 {
     constants_offset: usize,
     width: usize,
@@ -103,14 +102,12 @@ where
     pos: usize,
     current_round: usize,
     constants: &'a PoseidonConstants<E, A>,
-    _w: PhantomData<A>,
 }
 
 /// PoseidonCircuit implementation.
-impl<'a, E, A> PoseidonCircuit<'a, E, A>
+impl<'a, E, const A: usize> PoseidonCircuit<'a, E, A>
 where
     E: Engine,
-    A: Arity<E::Fr>,
 {
     /// Create a new Poseidon hasher for `preimage`.
     fn new(elements: Vec<Elt<E>>, constants: &'a PoseidonConstants<E, A>) -> Self {
@@ -123,7 +120,6 @@ where
             pos: width,
             current_round: 0,
             constants,
-            _w: PhantomData::<A>,
         }
     }
 
@@ -330,7 +326,7 @@ where
 }
 
 /// Create circuit for Poseidon hash.
-pub fn poseidon_hash<CS, E, A>(
+pub fn poseidon_hash<CS, E, const A: usize>(
     mut cs: CS,
     preimage: Vec<AllocatedNum<E>>,
     constants: &PoseidonConstants<E, A>,
@@ -338,9 +334,8 @@ pub fn poseidon_hash<CS, E, A>(
 where
     CS: ConstraintSystem<E>,
     E: Engine,
-    A: Arity<E::Fr>,
 {
-    let arity = A::to_usize();
+    let arity = A - 1;
     let tag_element = Elt::num_from_fr::<CS>(constants.domain_tag);
     let mut elements = Vec::with_capacity(arity + 1);
     elements.push(tag_element);
@@ -591,32 +586,30 @@ mod tests {
 
     #[test]
     fn test_poseidon_hash() {
-        test_poseidon_hash_aux::<typenum::U2>(Strength::Standard, 311, false);
-        test_poseidon_hash_aux::<typenum::U4>(Strength::Standard, 377, false);
-        test_poseidon_hash_aux::<typenum::U8>(Strength::Standard, 505, false);
-        test_poseidon_hash_aux::<typenum::U16>(Strength::Standard, 761, false);
-        test_poseidon_hash_aux::<typenum::U24>(Strength::Standard, 1009, false);
-        test_poseidon_hash_aux::<typenum::U36>(Strength::Standard, 1385, false);
+        test_poseidon_hash_aux::<3>(Strength::Standard, 311, false);
+        test_poseidon_hash_aux::<5>(Strength::Standard, 377, false);
+        test_poseidon_hash_aux::<9>(Strength::Standard, 505, false);
+        test_poseidon_hash_aux::<17>(Strength::Standard, 761, false);
+        test_poseidon_hash_aux::<25>(Strength::Standard, 1009, false);
+        test_poseidon_hash_aux::<37>(Strength::Standard, 1385, false);
 
-        test_poseidon_hash_aux::<typenum::U2>(Strength::Strengthened, 367, false);
-        test_poseidon_hash_aux::<typenum::U4>(Strength::Strengthened, 433, false);
-        test_poseidon_hash_aux::<typenum::U8>(Strength::Strengthened, 565, false);
-        test_poseidon_hash_aux::<typenum::U16>(Strength::Strengthened, 821, false);
-        test_poseidon_hash_aux::<typenum::U24>(Strength::Strengthened, 1069, false);
-        test_poseidon_hash_aux::<typenum::U36>(Strength::Strengthened, 1445, false);
+        test_poseidon_hash_aux::<3>(Strength::Strengthened, 367, false);
+        test_poseidon_hash_aux::<5>(Strength::Strengthened, 433, false);
+        test_poseidon_hash_aux::<9>(Strength::Strengthened, 565, false);
+        test_poseidon_hash_aux::<17>(Strength::Strengthened, 821, false);
+        test_poseidon_hash_aux::<25>(Strength::Strengthened, 1069, false);
+        test_poseidon_hash_aux::<37>(Strength::Strengthened, 1445, false);
 
-        test_poseidon_hash_aux::<typenum::U15>(Strength::Standard, 730, true);
+        test_poseidon_hash_aux::<16>(Strength::Standard, 730, true);
     }
 
-    fn test_poseidon_hash_aux<A>(
+    fn test_poseidon_hash_aux<const A: usize>(
         strength: Strength,
         expected_constraints: usize,
         constant_length: bool,
-    ) where
-        A: Arity<<Bls12 as Engine>::Fr>,
-    {
+    ) {
         let mut rng = XorShiftRng::from_seed(crate::TEST_SEED);
-        let arity = A::to_usize();
+        let arity = A + 1;
         let constants_x = if constant_length {
             PoseidonConstants::<Bls12, A>::new_with_strength_and_type(
                 strength,
