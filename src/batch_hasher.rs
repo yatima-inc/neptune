@@ -9,17 +9,13 @@ use crate::poseidon::SimplePoseidonBatchHasher;
 use crate::proteus::gpu::ClBatchHasher;
 #[cfg(feature = "futhark")]
 use crate::triton::{cl, gpu::GpuBatchHasher};
-use crate::{Arity, BatchHasher, Strength, DEFAULT_STRENGTH};
+use crate::{BatchHasher, Strength, DEFAULT_STRENGTH};
 use bellperson::bls::Fr;
-use generic_array::GenericArray;
 
 #[cfg(feature = "futhark")]
 use triton::FutharkContext;
 
-pub enum Batcher<A>
-where
-    A: Arity<Fr>,
-{
+pub enum Batcher<const A: usize> {
     Cpu(SimplePoseidonBatchHasher<A>),
     #[cfg(feature = "futhark")]
     OpenCl(GpuBatchHasher<A>),
@@ -27,10 +23,7 @@ where
     OpenCl(ClBatchHasher<A>),
 }
 
-impl<A> Batcher<A>
-where
-    A: Arity<Fr>,
-{
+impl<const A: usize> Batcher<A> {
     /// Create a new CPU batcher.
     pub fn new_cpu(max_batch_size: usize) -> Self {
         Self::with_strength_cpu(DEFAULT_STRENGTH, max_batch_size)
@@ -105,11 +98,8 @@ where
     }
 }
 
-impl<A> BatchHasher<A> for Batcher<A>
-where
-    A: Arity<Fr>,
-{
-    fn hash(&mut self, preimages: &[GenericArray<Fr, A>]) -> Result<Vec<Fr>, Error> {
+impl<const A: usize> BatchHasher<A> for Batcher<A> {
+    fn hash(&mut self, preimages: &[[Fr; A]]) -> Result<Vec<Fr>, Error> {
         match self {
             Batcher::Cpu(batcher) => batcher.hash(preimages),
             #[cfg(any(feature = "futhark", feature = "opencl"))]

@@ -14,6 +14,7 @@ use ff::{Field, ScalarEngine};
 pub fn hash_correct<E, const A: usize>(p: &mut Poseidon<E, A>) -> E::Fr
 where
     E: ScalarEngine,
+    [(); A + 1]: ,
 {
     // This counter is incremented when a round constants is read. Therefore, the round constants never repeat.
     // The first full round should use the initial constants.
@@ -39,6 +40,7 @@ where
 pub fn full_round<E, const A: usize>(p: &mut Poseidon<E, A>)
 where
     E: ScalarEngine,
+    [(); A + 1]: ,
 {
     // Apply the quintic S-Box to all elements, after adding the round key.
     // Round keys are added in the S-box to match circuits (where the addition is free)
@@ -69,6 +71,7 @@ where
 pub fn partial_round<E, const A: usize>(p: &mut Poseidon<E, A>)
 where
     E: ScalarEngine,
+    [(); A + 1]: ,
 {
     // Every element of the hash buffer is incremented by the round constants
     add_round_constants(p);
@@ -91,6 +94,7 @@ where
 pub fn hash_optimized_dynamic<E, const A: usize>(p: &mut Poseidon<E, A>) -> E::Fr
 where
     E: ScalarEngine,
+    [(); A + 1]: ,
 {
     // The first full round should use the initial constants.
     full_round_dynamic(p, true, true);
@@ -118,6 +122,7 @@ pub fn full_round_dynamic<E, const A: usize>(
     absorb_next_round_keys: bool,
 ) where
     E: ScalarEngine,
+    [(); A + 1]: ,
 {
     // NOTE: decrease in performance is expected when using this pathway.
     // We seek to preserve correctness while transforming the algorithm to an eventually more performant one.
@@ -206,6 +211,7 @@ pub fn full_round_dynamic<E, const A: usize>(
 pub fn partial_round_dynamic<E, const A: usize>(p: &mut Poseidon<E, A>)
 where
     E: ScalarEngine,
+    [(); A + 1]: ,
 {
     // Apply the quintic S-Box to the first element
     quintic_s_box::<E>(&mut p.elements[0], None, None);
@@ -219,6 +225,7 @@ where
 fn add_round_constants<E, const A: usize>(p: &mut Poseidon<E, A>)
 where
     E: ScalarEngine,
+    [(); A + 1]: ,
 {
     for (element, round_constant) in p
         .elements

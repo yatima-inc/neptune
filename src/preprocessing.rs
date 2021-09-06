@@ -6,8 +6,7 @@ use ff::{Field, ScalarEngine};
 // - Compress constants by pushing them back through linear layers and through the identity components of partial layers.
 // - As a result, constants need only be added after each S-box.
 #[allow(clippy::ptr_arg)]
-pub(crate) fn compress_round_constants<E: ScalarEngine>(
-    width: usize,
+pub(crate) fn compress_round_constants<E: ScalarEngine, const W: usize>(
     full_rounds: usize,
     partial_rounds: usize,
     round_constants: &Vec<E::Fr>,
@@ -19,7 +18,7 @@ pub(crate) fn compress_round_constants<E: ScalarEngine>(
 
     let mut res = Vec::new();
 
-    let round_keys = |r: usize| &round_constants[r * width..(r + 1) * width];
+    let round_keys = |r: usize| &round_constants[r * W..(r + 1) * W];
 
     let half_full_rounds = full_rounds / 2; // Not half-full rounds; half full-rounds.
 
@@ -108,7 +107,7 @@ pub(crate) fn compress_round_constants<E: ScalarEngine>(
         ////////////////////////////////////////////////////////////////////////////////
         // Shared between branches, arbitrary initial state representing the output of a previous round's S-Box layer.
         // X
-        let initial_state = vec![E::Fr::one(); width];
+        let initial_state = [E::Fr::one(); W];
 
         ////////////////////////////////////////////////////////////////////////////////
         // Compute one step with the given (unpreprocessed) constants.

@@ -95,6 +95,7 @@ impl<E: Engine> Elt<E> {
 pub struct PoseidonCircuit<'a, E, const A: usize>
 where
     E: Engine,
+    [(); A + 1]: ,
 {
     constants_offset: usize,
     width: usize,
@@ -108,10 +109,11 @@ where
 impl<'a, E, const A: usize> PoseidonCircuit<'a, E, A>
 where
     E: Engine,
+    [(); A + 1]: ,
 {
     /// Create a new Poseidon hasher for `preimage`.
     fn new(elements: Vec<Elt<E>>, constants: &'a PoseidonConstants<E, A>) -> Self {
-        let width = constants.width();
+        let width = A + 1;
 
         PoseidonCircuit {
             constants_offset: 0,
@@ -334,10 +336,11 @@ pub fn poseidon_hash<CS, E, const A: usize>(
 where
     CS: ConstraintSystem<E>,
     E: Engine,
+    [(); A + 1]: ,
 {
-    let arity = A - 1;
+    let arity = A;
     let tag_element = Elt::num_from_fr::<CS>(constants.domain_tag);
-    let mut elements = Vec::with_capacity(arity + 1);
+    let mut elements = Vec::with_capacity(A + 1);
     elements.push(tag_element);
     elements.extend(preimage.into_iter().map(Elt::Allocated));
 
@@ -607,7 +610,9 @@ mod tests {
         strength: Strength,
         expected_constraints: usize,
         constant_length: bool,
-    ) {
+    ) where
+        [(); A + 1]: ,
+    {
         let mut rng = XorShiftRng::from_seed(crate::TEST_SEED);
         let arity = A - 1;
         let constants_x = if constant_length {

@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![feature(generic_const_exprs)]
+#![allow(incomplete_features)]
 #[macro_use]
 extern crate lazy_static;
 
@@ -64,12 +66,12 @@ pub(crate) const DEFAULT_STRENGTH: Strength = Strength::Standard;
 pub trait BatchHasher<const A: usize> {
     // type State;
 
-    fn hash(&mut self, preimages: &[[Scalar; A]]) -> Result<Vec<Scalar>, Error>;
+    fn hash(&mut self, preimages: &[[Scalar; A - 1]]) -> Result<Vec<Scalar>, Error>;
 
     fn hash_into_slice(
         &mut self,
         target_slice: &mut [Scalar],
-        preimages: &[[Scalar; A]],
+        preimages: &[[Scalar; A - 1]],
     ) -> Result<(), Error> {
         assert_eq!(target_slice.len(), preimages.len());
         // FIXME: Account for max batch size.

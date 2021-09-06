@@ -2,25 +2,18 @@ use super::sources::generate_program;
 use crate::error::{ClError, Error};
 use crate::hash_type::HashType;
 use crate::poseidon::PoseidonConstants;
-use crate::{Arity, BatchHasher, Strength, DEFAULT_STRENGTH};
+use crate::{BatchHasher, Strength, DEFAULT_STRENGTH};
 use bellperson::bls::{Bls12, Fr, FrRepr};
 use ff::{Field, PrimeField, PrimeFieldDecodingError};
-use generic_array::{typenum, ArrayLength, GenericArray};
 use log::info;
 use rust_gpu_tools::opencl::{self, cl_device_id, Device};
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use typenum::{U11, U2, U8};
 
 #[derive(Debug)]
-struct GpuConstants<A>(PoseidonConstants<Bls12, A>)
-where
-    A: Arity<Fr>;
+struct GpuConstants<const A: usize>(PoseidonConstants<Bls12, A>);
 
-pub struct ClBatchHasher<A>
-where
-    A: Arity<Fr>,
-{
+pub struct ClBatchHasher<const A: usize> {
     device: opencl::Device,
     constants: GpuConstants<A>,
     constants_buffer: opencl::Buffer<Fr>,
@@ -47,10 +40,7 @@ pub struct DerivedConstants {
     pub v_rest_offset: usize,
 }
 
-impl<A> GpuConstants<A>
-where
-    A: Arity<Fr>,
-{
+impl<const A: usize> GpuConstants<A> {
     #[allow(clippy::suspicious_operation_groupings)]
     fn derived_constants(&self) -> DerivedConstants {
         let c = &self.0;
@@ -100,10 +90,7 @@ where
     }
 }
 
-impl<A> GpuConstants<A>
-where
-    A: Arity<Fr>,
-{
+impl<const A: usize> GpuConstants<A> {
     fn full_rounds(&self) -> usize {
         self.0.full_rounds
     }
@@ -137,10 +124,7 @@ where
     }
 }
 
-impl<A> ClBatchHasher<A>
-where
-    A: Arity<Fr>,
-{
+impl<const A: usize> ClBatchHasher<A> {
     /// Create a new `GPUBatchHasher` and initialize it with state corresponding with its `A`.
     pub(crate) fn new(device: &opencl::Device, max_batch_size: usize) -> Result<Self, Error> {
         Self::new_with_strength(device, DEFAULT_STRENGTH, max_batch_size)
@@ -170,11 +154,8 @@ where
     }
 }
 const LOCAL_WORK_SIZE: usize = 256;
-impl<A> BatchHasher<A> for ClBatchHasher<A>
-where
-    A: Arity<Fr>,
-{
-    fn hash(&mut self, preimages: &[GenericArray<Fr, A>]) -> Result<Vec<Fr>, Error> {
+impl<const A: usize> BatchHasher<A> for ClBatchHasher<A> {
+    fn hash(&mut self, preimages: &[[Fr; A]]) -> Result<Vec<Fr>, Error> {
         let local_work_size = LOCAL_WORK_SIZE;
         let max_batch_size = self.max_batch_size;
         let batch_size = preimages.len();
@@ -194,7 +175,7 @@ where
 
         let preimages_buffer = self
             .program
-            .create_buffer::<GenericArray<Fr, A>>(num_hashes)
+            .create_buffer::<[Fr; A]>(num_hashes)
             .map_err(|e| Error::GpuError(format!("{:?}", e)))?;
 
         self.program
@@ -230,7 +211,6 @@ where
 mod test {
     use super::*;
     use crate::poseidon::{Poseidon, SimplePoseidonBatchHasher};
-    use generic_array::sequence::GenericSequence;
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
 
@@ -244,12 +224,12 @@ mod test {
         let batch_size = 1025;
 
         let mut cl_hasher =
-            ClBatchHasher::<U2>::new_with_strength(device, Strength::Standard, batch_size).unwrap();
+            ClBatchHasher::<3>::new_with_strength(device, Strength::Standard, batch_size).unwrap();
         let mut simple_hasher =
-            SimplePoseidonBatchHasher::<U2>::new_with_strength(Strength::Standard, batch_size);
+            SimplePoseidonBatchHasher::<2>::new_with_strength(Strength::Standard, batch_size);
 
         let preimages = (0..batch_size)
-            .map(|_| GenericArray::<Fr, U2>::generate(|_| Fr::random(&mut rng)))
+            .map(|_| [Fr::random(&mut rng); 2])
             .collect::<Vec<_>>();
 
         let cl_hashes = cl_hasher.hash(&preimages).unwrap();

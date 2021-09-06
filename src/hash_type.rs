@@ -16,7 +16,10 @@ use crate::{scalar_from_u64, Strength};
 use ff::{Field, PrimeField, ScalarEngine};
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum HashType<Fr: PrimeField, const A: usize> {
+pub enum HashType<Fr: PrimeField, const A: usize>
+where
+    [(); A + 1]: ,
+{
     MerkleTree,
     MerkleTreeSparse(u64),
     VariableLength,
@@ -27,10 +30,13 @@ pub enum HashType<Fr: PrimeField, const A: usize> {
 
 pub fn tag<Fr: PrimeField, const A: usize>() -> Fr {
     assert!(A > 0);
-    scalar_from_u64::<Fr>((1 << (A - 1)) - 1)
+    scalar_from_u64::<Fr>((1 << A) - 1)
 }
 
-impl<Fr: PrimeField, const A: usize> HashType<Fr, A> {
+impl<Fr: PrimeField, const A: usize> HashType<Fr, A>
+where
+    [(); A + 1]: ,
+{
     pub fn domain_tag(&self, strength: &Strength) -> Fr {
         let pow2 = |n| pow2::<Fr, A>(n);
         let x_pow2 = |coeff, n| x_pow2::<Fr, A>(coeff, n);
@@ -50,7 +56,7 @@ impl<Fr: PrimeField, const A: usize> HashType<Fr, A> {
             // length * 2^64
             // length must be greater than 0 and <= arity
             HashType::ConstantLength(length) => {
-                assert!(*length as usize <= A - 1);
+                assert!(*length as usize <= A);
                 assert!(*length as usize > 0);
                 with_strength(x_pow2(*length as u64, 64))
             }

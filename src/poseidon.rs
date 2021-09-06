@@ -14,11 +14,12 @@ use std::marker::PhantomData;
 pub struct Poseidon<'a, E, const A: usize>
 where
     E: ScalarEngine,
+    [(); A + 1]: ,
 {
     pub(crate) constants_offset: usize,
     pub(crate) current_round: usize, // Used in static optimization only for now.
     /// the elements to permute
-    pub elements: [E::Fr; A],
+    pub elements: [E::Fr; A + 1],
     pos: usize,
     pub(crate) constants: &'a PoseidonConstants<E, A>,
     _e: PhantomData<E>,
@@ -28,6 +29,7 @@ where
 pub struct PoseidonConstants<E, const A: usize>
 where
     E: ScalarEngine,
+    [(); A + 1]: ,
 {
     pub mds_matrices: MdsMatrices<E>,
     pub round_constants: Vec<E::Fr>,
@@ -62,6 +64,7 @@ pub const DEFAULT_HASH_MODE: HashMode = OptimizedStatic;
 impl<'a, E, const A: usize> PoseidonConstants<E, A>
 where
     E: ScalarEngine,
+    [(); A + 1]: ,
 {
     pub fn new() -> Self {
         Self::new_with_strength(DEFAULT_STRENGTH)
@@ -70,12 +73,12 @@ where
     /// `new_constant_length` creates constants for hashing a constant-sized preimage which is <= the max
     /// supported by the permutation width.
     pub fn new_constant_length(length: usize) -> Self {
-        assert!(length <= A - 1);
+        assert!(length <= A);
         Self::new_with_strength_and_type(DEFAULT_STRENGTH, HashType::ConstantLength(length))
     }
 
     pub fn with_length(&self, length: usize) -> Self {
-        assert!(length <= A - 1);
+        assert!(length <= A);
 
         let hash_type = match self.hash_type {
             HashType::ConstantLength(_) => HashType::ConstantLength(length),
@@ -97,15 +100,15 @@ where
 
     pub fn new_with_strength_and_type(strength: Strength, hash_type: HashType<E::Fr, A>) -> Self {
         assert!(hash_type.is_supported());
-        let arity = A - 1;
+        let arity = A;
+        let width = A + 1;
 
         let mds_matrices = create_mds_matrices::<E>(A);
 
         let (full_rounds, partial_rounds) = round_numbers(arity, &strength);
         let half_full_rounds = full_rounds / 2;
         let round_constants = round_constants::<E>(arity, &strength);
-        let compressed_round_constants = compress_round_constants::<E>(
-            A,
+        let compressed_round_constants = compress_round_constants::<E, { A + 1 }>(
             full_rounds,
             partial_rounds,
             &round_constants,
@@ -118,12 +121,12 @@ where
 
         // Ensure we have enough constants for the sbox rounds
         assert!(
-            A * (full_rounds + partial_rounds) <= round_constants.len(),
+            width * (full_rounds + partial_rounds) <= round_constants.len(),
             "Not enough round constants"
         );
 
         assert_eq!(
-            full_rounds * A + partial_rounds,
+            full_rounds * width + partial_rounds,
             compressed_round_constants.len()
         );
 
@@ -158,6 +161,7 @@ where
 impl<E, const A: usize> Default for PoseidonConstants<E, A>
 where
     E: ScalarEngine,
+    [(); A + 1]: ,
 {
     fn default() -> Self {
         Self::new()
@@ -167,9 +171,10 @@ where
 impl<'a, E, const A: usize> Poseidon<'a, E, A>
 where
     E: ScalarEngine,
+    [(); A + 1]: ,
 {
     pub fn new(constants: &'a PoseidonConstants<E, A>) -> Self {
-        let mut elements = [E::Fr::zero(); A];
+        let mut elements = [E::Fr::zero(); A + 1];
         elements[0] = constants.domain_tag;
 
         Poseidon {
@@ -183,7 +188,7 @@ where
     }
 
     pub fn new_with_preimage(preimage: &[E::Fr], constants: &'a PoseidonConstants<E, A>) -> Self {
-        let mut elements = [E::Fr::zero(); A];
+        let mut elements = [E::Fr::zero(); A + 1];
         elements[0] = constants.domain_tag;
 
         match constants.hash_type {
@@ -194,7 +199,7 @@ where
             }
             HashType::VariableLength => panic!("variable-length hashes are not yet supported."),
             _ => {
-                assert_eq!(preimage.len(), A - 1, "Invalid preimage size");
+                assert_eq!(preimage.len(), A, "Invalid preimage size");
 
                 elements[1..].copy_from_slice(preimage);
             }
@@ -406,7 +411,7 @@ where
     /// exploits the fact that our MDS matrices are symmetric by construction.
     #[allow(clippy::ptr_arg)]
     pub(crate) fn product_mds_with_matrix(&mut self, matrix: &Matrix<E::Fr>) {
-        let mut result = [E::Fr::zero(); A];
+        let mut result = [E::Fr::zero(); A + 1];
 
         for (j, val) in result.iter_mut().enumerate() {
             for (i, row) in matrix.iter().enumerate() {
@@ -421,7 +426,7 @@ where
 
     // Sparse matrix in this context means one of the form, M''.
     fn product_mds_with_sparse_matrix(&mut self, sparse_matrix: &SparseMatrix<E>) {
-        let mut result = [E::Fr::zero(); A];
+        let mut result = [E::Fr::zero(); A + 1];
 
         // First column is dense.
         for (i, val) in sparse_matrix.w_hat.iter().enumerate() {
@@ -449,12 +454,18 @@ where
 }
 
 #[derive(Debug)]
-pub struct SimplePoseidonBatchHasher<const A: usize> {
+pub struct SimplePoseidonBatchHasher<const A: usize>
+where
+    [(); A + 1]: ,
+{
     constants: PoseidonConstants<Bls12, A>,
     max_batch_size: usize,
 }
 
-impl<const A: usize> SimplePoseidonBatchHasher<A> {
+impl<const A: usize> SimplePoseidonBatchHasher<A>
+where
+    [(); A + 1]: ,
+{
     pub(crate) fn new(max_batch_size: usize) -> Self {
         Self::new_with_strength(DEFAULT_STRENGTH, max_batch_size)
     }
@@ -466,8 +477,11 @@ impl<const A: usize> SimplePoseidonBatchHasher<A> {
         }
     }
 }
-impl<const A: usize> BatchHasher<A> for SimplePoseidonBatchHasher<A> {
-    fn hash(&mut self, preimages: &[[Fr; A]]) -> Result<Vec<Fr>, Error> {
+impl<const A: usize> BatchHasher<A> for SimplePoseidonBatchHasher<A>
+where
+    [(); A + 1]: ,
+{
+    fn hash(&mut self, preimages: &[[Fr; A - 1]]) -> Result<Vec<Fr>, Error> {
         Ok(preimages
             .iter()
             .map(|preimage| Poseidon::new_with_preimage(&preimage[..], &self.constants).hash())
@@ -491,11 +505,11 @@ mod tests {
         let test_arity = 2;
         let preimage = vec![Scalar::one(); test_arity];
         let constants = PoseidonConstants::new();
-        let mut h = Poseidon::<Bls12, 3>::new_with_preimage(&preimage, &constants);
+        let mut h = Poseidon::<Bls12, 2>::new_with_preimage(&preimage, &constants);
         h.hash();
         h.reset();
 
-        let default = Poseidon::<Bls12, 3>::new(&constants);
+        let default = Poseidon::<Bls12, 2>::new(&constants);
         assert_eq!(default.pos, h.pos);
         assert_eq!(default.elements, h.elements);
         assert_eq!(default.constants_offset, h.constants_offset);
@@ -508,7 +522,7 @@ mod tests {
         let constants = PoseidonConstants::new();
         preimage[0] = Scalar::one();
 
-        let mut h = Poseidon::<Bls12, 3>::new_with_preimage(&preimage, &constants);
+        let mut h = Poseidon::<Bls12, 2>::new_with_preimage(&preimage, &constants);
 
         let mut h2 = h.clone();
         let result: <Bls12 as ScalarEngine>::Fr = h.hash();
@@ -522,7 +536,7 @@ mod tests {
         let constants = PoseidonConstants::new();
         preimage[0] = Scalar::one();
 
-        let mut h = Poseidon::<Bls12, 4>::new_with_preimage(&preimage, &constants);
+        let mut h = Poseidon::<Bls12, 3>::new_with_preimage(&preimage, &constants);
 
         let mut h2 = h.clone();
         let result: <Bls12 as ScalarEngine>::Fr = h.hash();
@@ -537,17 +551,20 @@ mod tests {
     }
 
     fn hash_values_cases(strength: Strength) {
-        hash_values_aux::<3>(strength);
-        hash_values_aux::<5>(strength);
-        hash_values_aux::<9>(strength);
-        hash_values_aux::<12>(strength);
-        hash_values_aux::<17>(strength);
-        hash_values_aux::<25>(strength);
-        hash_values_aux::<37>(strength);
+        hash_values_aux::<2>(strength);
+        hash_values_aux::<4>(strength);
+        hash_values_aux::<8>(strength);
+        hash_values_aux::<11>(strength);
+        hash_values_aux::<16>(strength);
+        hash_values_aux::<24>(strength);
+        hash_values_aux::<36>(strength);
     }
 
     /// Simple test vectors to ensure results don't change unintentionally in development.
-    fn hash_values_aux<const A: usize>(strength: Strength) {
+    fn hash_values_aux<const A: usize>(strength: Strength)
+    where
+        [(); A + 1]: ,
+    {
         let constants = PoseidonConstants::<Bls12, A>::new_with_strength(strength);
         let mut p = Poseidon::<Bls12, A>::new(&constants);
         let mut p2 = Poseidon::<Bls12, A>::new(&constants);
@@ -682,8 +699,8 @@ mod tests {
 
     #[test]
     fn hash_compare_optimized() {
-        let constants = PoseidonConstants::<Bls12, 3>::new();
-        let mut p = Poseidon::<Bls12, 3>::new(&constants);
+        let constants = PoseidonConstants::<Bls12, 2>::new();
+        let mut p = Poseidon::<Bls12, 2>::new(&constants);
         let test_arity = constants.arity();
         for n in 0..test_arity {
             let scalar = scalar_from_u64::<Fr>(n as u64);
@@ -703,9 +720,9 @@ mod tests {
 
     #[test]
     fn default_is_standard() {
-        let default_constants = PoseidonConstants::<Bls12, 9>::new();
+        let default_constants = PoseidonConstants::<Bls12, 8>::new();
         let standard_constants =
-            PoseidonConstants::<Bls12, 9>::new_with_strength(Strength::Standard);
+            PoseidonConstants::<Bls12, 8>::new_with_strength(Strength::Standard);
 
         assert_eq!(
             standard_constants.partial_rounds,
