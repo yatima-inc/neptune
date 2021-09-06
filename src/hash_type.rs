@@ -23,12 +23,11 @@ pub enum HashType<Fr: PrimeField, const A: usize> {
     ConstantLength(usize),
     Encryption,
     Custom(CType<Fr, A>),
-    _Unreachable(std::convert::Infallible, PhantomData<Fr>, [(); A]),
 }
 
 pub fn tag<Fr: PrimeField, const A: usize>() -> Fr {
     assert!(A > 0);
-    scalar_from_u64::<Fr>((1 << A) - 1)
+    scalar_from_u64::<Fr>((1 << (A - 1)) - 1)
 }
 
 impl<Fr: PrimeField, const A: usize> HashType<Fr, A> {
@@ -61,7 +60,6 @@ impl<Fr: PrimeField, const A: usize> HashType<Fr, A> {
             // NOTE: in order to leave room for future `Strength` tags,
             // we make identifier a multiple of 2^40 rather than 2^32.
             HashType::Custom(ref ctype) => ctype.domain_tag(&strength),
-            HashType::_Unreachable(_, _, _) => unreachable!(),
         }
     }
 
@@ -86,7 +84,6 @@ impl<Fr: PrimeField, const A: usize> HashType<Fr, A> {
             HashType::ConstantLength(_) => true,
             HashType::Encryption => true,
             HashType::Custom(_) => false,
-            HashType::_Unreachable(_, _, _) => unreachable!(),
         }
     }
 }
@@ -94,14 +91,14 @@ impl<Fr: PrimeField, const A: usize> HashType<Fr, A> {
 #[derive(Clone, Debug, PartialEq)]
 pub enum CType<Fr: PrimeField, const A: usize> {
     Arbitrary(u64),
-    _Unreachable(std::convert::Infallible, PhantomData<Fr>, [(); A]),
+    _Unreachable(std::convert::Infallible, PhantomData<Fr>),
 }
 
 impl<Fr: PrimeField, const A: usize> CType<Fr, A> {
     fn identifier(&self) -> u64 {
         match self {
             CType::Arbitrary(id) => *id,
-            Self::_Unreachable(_, _, _) => unreachable!(),
+            Self::_Unreachable(_, _) => unreachable!(),
         }
     }
 

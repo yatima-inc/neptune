@@ -609,7 +609,7 @@ mod tests {
         constant_length: bool,
     ) {
         let mut rng = XorShiftRng::from_seed(crate::TEST_SEED);
-        let arity = A + 1;
+        let arity = A - 1;
         let constants_x = if constant_length {
             PoseidonConstants::<Bls12, A>::new_with_strength_and_type(
                 strength,
