@@ -10,7 +10,7 @@ resolver = "2"
 
 [dependencies]
 lazy_static = "1.4.0"
-bellperson = { git = "https://github.com/lurk-lang/bellperson", branch = "acs/wasm-support", version = "0.18.0", default-features = false, optional = true }
+bellperson = { git = "https://github.com/lurk-lang/bellperson", branch = "acs/wasm-support", version = "0.18.0", default-features = false }
 blake2s_simd = "0.5"
 blstrs = "0.4.0"
 byteorder = "1"
@@ -52,7 +52,7 @@ incremental = false
 codegen-units = 1
 
 [features]
-default = [ "bellperson" ]
+default = []
 cuda = ["rust-gpu-tools/cuda", "blstrs/gpu", "ec-gpu-gen", "ec-gpu"]
 opencl = ["rust-gpu-tools/opencl", "blstrs/gpu", "ec-gpu-gen", "ec-gpu"]
 # The supported arities for Poseidon running on the GPU are specified at compile-time.
