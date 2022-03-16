@@ -10,30 +10,55 @@
       url = github:nix-community/naersk;
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    utils = {
-      url = github:yatima-inc/nix-utils;
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.flake-utils.follows = "flake-utils";
-      inputs.naersk.follows = "naersk";
-    };
   };
 
   outputs =
     { self
     , nixpkgs
     , flake-utils
-    , utils
     , naersk
     }:
-    utils.lib.eachDefaultSystem (system:
+    flake-utils.lib.eachDefaultSystem (system:
     let
-      # Contains nixpkgs.lib, flake-utils.lib and custom functions
-      lib = utils.lib.${system};
+      lib = nixpkgs.lib.${system};
       pkgs = nixpkgs.legacyPackages.${system};
-      inherit (lib) buildRustProject testRustProject getRust filterRustProject;
+      rustTools = import ./nix/rust.nix {
+        nixpkgs = pkgs;
+      };
+      getRust =
+        { channel ? "nightly"
+        , date
+        , sha256
+        , targets ? [
+          "wasm32-unknown-unknown"
+          "wasm32-wasi"
+          # "wasm32-unknown-emscripten"
+        ]
+        }: (rustTools.rustChannelOf {
+          inherit channel date sha256;
+        }).rust.override {
+          inherit targets;
+          extensions = [ "rust-src" "rust-analysis" ];
+        };
+      rust = getRust { date = "2022-03-15"; sha256 = "sha256-C7X95SGY0D7Z17I8J9hg3z9cRnpXP7FjAOkvEdtB9nE="; };
+      # Get a naersk with the input rust version
+      naerskWithRust = rust: naersk.lib."${system}".override {
+        rustc = rust;
+        cargo = rust;
+      };
+      # Naersk using the default rust version
+      buildRustProject = pkgs.makeOverridable ({ rust, naersk ? naerskWithRust rust, ... } @ args: naersk.buildPackage ({
+        buildInputs = with pkgs; [ ];
+        targets = [ ];
+        copyLibs = true;
+        remapPathPrefix =
+          true; # remove nix store references for a smaller output package
+      } // args));
+
+      # Convenient for running tests
+      testRustProject = args: buildRustProject ({ doCheck = true; inherit root rust; } // args);
       # Load a nightly rust. The hash takes precedence over the date so remember to set it to
       # something like `lib.fakeSha256` when changing the date.
-      rust = getRust { date = "2022-02-20"; sha256 = "sha256-ZptNrC/0Eyr0c3IiXVWTJbuprFHq6E1KfBgqjGQBIRs="; };
       crateName = "neptune";
       root = ./.;
       # This is a wrapper around naersk build
@@ -41,17 +66,21 @@
       project = buildRustProject {
         inherit root rust;
       };
+      wasm = project.override {
+        targets = [ "wasm32-unknown-unknown" ];
+        CC = "${pkgs.emscripten}/bin/emcc";
+        copyBins = true;
+        cargoBuildOptions = opt: opt ++ [ "--features wasm" "--no-default-features" ];
+      };
     in
     {
-      packages.${crateName} = project;
-      checks.${crateName} = testRustProject { inherit root; };
+      packages = {
+        ${crateName} = project;
+        "${crateName}-wasm" = wasm;
+        "${crateName}-test" = testRustProject {};
+      };
 
       defaultPackage = self.packages.${system}.${crateName};
-
-      # To run with `nix run`
-      apps.${crateName} = flake-utils.lib.mkApp {
-        drv = project;
-      };
 
       # `nix develop`
       devShell = pkgs.mkShell {

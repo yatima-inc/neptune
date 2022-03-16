@@ -54,34 +54,7 @@
       "inputs": {
         "flake-utils": "flake-utils",
         "naersk": "naersk",
-        "nixpkgs": "nixpkgs",
-        "utils": "utils"
-      }
-    },
-    "utils": {
-      "inputs": {
-        "flake-utils": [
-          "flake-utils"
-        ],
-        "naersk": [
-          "naersk"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1644486991,
-        "narHash": "sha256-Ropk+nng526s0It4/LCvhxD6pWt/KcrB9yB1r0GKSRA=",
-        "owner": "yatima-inc",
-        "repo": "nix-utils",
-        "rev": "8f35a9ec2dd4d0fb3ae547e0544314a27534220f",
-        "type": "github"
-      },
-      "original": {
-        "owner": "yatima-inc",
-        "repo": "nix-utils",
-        "type": "github"
+        "nixpkgs": "nixpkgs"
       }
     }
   },
